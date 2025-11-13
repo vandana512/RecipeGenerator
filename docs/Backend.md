@@ -89,12 +89,15 @@ pip install -r requirements.txt
 ```
 OPENAI_API_KEY=your_openai_api_key_here
 ```
-
-3. Run the backend:
+3. Change Directory:
+```
+cd Backend
+```
+4. Run the backend:
 
 ```
 uvicorn app:app --reload
 ```
 
-4. Then open → http://127.0.0.1:8000/docs
+5. Then open → http://127.0.0.1:8000/docs
 
