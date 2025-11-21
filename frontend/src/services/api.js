@@ -1,64 +1,84 @@
-const mockRecipes = [
-  {
-    title: 'Grilled Herb Chicken & Roasted Vegetables',
-    description: 'A healthy and delicious meal featuring tender grilled chicken with perfectly roasted seasonal vegetables.',
-    ingredients: [
-      'Grilled Herb Chicken & Roasted vegetables',
-      'Top to textillion tho br edses ii mp tntd ossert to out clolls',
-    ],
-    steps: [
-      'Aroasth Herb Chicken & Roastel! i qniec itine vegetables',
-      'Trd rnzone and welng oriddn & oo cnelsalxs',
-      'Piroerntux bhittep ton ap epmorr ne ts am oottnn ktable',
-    ],
-  },
-  {
-    title: 'Mediterranean Quinoa Bowl',
-    description: 'Fresh and vibrant quinoa bowl with cherry tomatoes, cucumber, and herbs.',
-    ingredients: [
-      '1 cup quinoa, cooked',
-      '2 cups cherry tomatoes, halved',
-      '1 cucumber, diced',
-      'Fresh herbs (parsley, mint)',
-      'Olive oil and lemon dressing',
-    ],
-    steps: [
-      'Cook quinoa according to package instructions and let cool',
-      'Chop all vegetables into bite-sized pieces',
-      'Combine quinoa and vegetables in a bowl',
-      'Drizzle with olive oil and lemon juice',
-      'Garnish with fresh herbs and serve',
-    ],
-  },
-  {
-    title: 'Avocado Toast Supreme',
-    description: 'Elevated avocado toast with perfectly seasoned avocado and fresh toppings.',
-    ingredients: [
-      '2 ripe avocados',
-      '4 slices artisan bread, toasted',
-      'Cherry tomatoes',
-      'Red pepper flakes',
-      'Sea salt and black pepper',
-      'Olive oil drizzle',
-    ],
-    steps: [
-      'Toast bread slices until golden brown',
-      'Mash avocados with salt, pepper, and lemon juice',
-      'Spread avocado mixture generously on toast',
-      'Top with halved cherry tomatoes',
-      'Sprinkle with red pepper flakes and drizzle olive oil',
-    ],
-  },
-];
+const API_BASE_URL = 'http://localhost:8000'; // Update this to your FastAPI server URL
 
-export const uploadImageToServer = async (dataUrl) => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      const randomRecipe = mockRecipes[Math.floor(Math.random() * mockRecipes.length)];
-      resolve({
-        success: true,
-        recipe: randomRecipe,
-      });
-    }, 2000);
-  });
+/**
+ * Convert base64 or data URL to File object
+ */
+const dataURLtoFile = (dataUrl, filename) => {
+  const arr = dataUrl.split(',');
+  const mime = arr[0].match(/:(.*?);/)[1];
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new File([u8arr], filename, { type: mime });
+};
+
+/**
+ * Upload image to server and get recipe
+ * @param {string} imageData - Base64 encoded image or data URL
+ * @returns {Promise<{success: boolean, recipe: object, ingredients: array, error?: string}>}
+ */
+export const uploadImageToServer = async (imageData) => {
+  try {
+    // Convert base64/data URL to File
+    const file = dataURLtoFile(imageData, 'food-image.jpg');
+    
+    // Create FormData
+    const formData = new FormData();
+    formData.append('file', file);
+
+    // Send to backend
+    const response = await fetch(`${API_BASE_URL}/detect_and_generate`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Check if there's an error in the response
+    if (data.error) {
+      throw new Error(data.error);
+    }
+
+    // Format the response to match frontend expectations
+    return {
+      success: true,
+      ingredients: data.ingredients || [],
+      recipe: {
+        name: data.recipe?.recipe_name || 'Generated Recipe',
+        ingredients: data.recipe?.ingredients || [],
+        instructions: data.recipe?.steps || [],
+        // If the API returns recipe_text instead of structured data
+        text: data.recipe?.recipe_text || null
+      }
+    };
+
+  } catch (error) {
+    console.error('Error uploading image to server:', error);
+    return {
+      success: false,
+      error: error.message,
+      recipe: null,
+      ingredients: []
+    };
+  }
+};
+
+/**
+ * Health check endpoint
+ */
+export const checkServerHealth = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/`);
+    return response.ok;
+  } catch (error) {
+    console.error('Server health check failed:', error);
+    return false;
+  }
 };
