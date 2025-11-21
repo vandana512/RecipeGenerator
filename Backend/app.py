@@ -2,13 +2,13 @@ from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 import shutil
 from detect import detect_ingredients
-from openai import OpenAI
+import google.generativeai as genai
 import os
 import traceback
 from dotenv import load_dotenv
 import json
 
-load_dotenv(".env")  # Load .env for OPENAI_API_KEY
+load_dotenv(".env")  # Load .env for GEMINI_API_KEY
 
 # ---- Initialize app ----
 app = FastAPI(title="AI Recipe Assistant")
@@ -49,18 +49,17 @@ generate a recipe response in strict JSON with this format:
 }}
 """
 
-        # call OpenAI (make sure OPENAI_API_KEY exists in .env)
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a helpful AI chef assistant."},
-                {"role": "user", "content": prompt}
-            ]
-        )
+        genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-        # Try to parse LLM output as JSON
-        content = response.choices[0].message.content
+# Load model
+        model = genai.GenerativeModel("gemini-2.5-flash")
+
+# Call Gemini
+        response = model.generate_content(prompt)
+
+# Extract text safely
+        content = response.text
+
         try:
             recipe_json = json.loads(content)
         except json.JSONDecodeError:
