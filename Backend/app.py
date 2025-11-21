@@ -30,24 +30,26 @@ async def detect_and_generate(file: UploadFile = File(...)):
     with open(temp_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    # Run YOLO detection
-    detected = detect_ingredients(temp_path)
-    ingredients_list = ", ".join([f"{i['count']} {i['name']}" for i in detected["ingredients"]])
-
-    # ---- LLM Prompt ----
-    prompt = f"""
-    You are a professional chef assistant.
-    Using only these ingredients: {ingredients_list},
-    generate a recipe response in **strict JSON** with this format:
-
-    {{
-      "recipe_name": "string",
-      "ingredients": ["list of ingredients"],
-      "steps": ["list of short numbered steps"]
-    }}
-    """
-
     try:
+        # Run YOLO detection (detect_ingredients should return {"ingredients": [{"name":..., "count":...}, ...]})
+        detected = detect_ingredients(temp_path)
+        # Build ingredients list string for prompt
+        ingredients_list = ", ".join([f"{i['count']} {i['name']}" for i in detected.get("ingredients", [])])
+
+        # ---- LLM Prompt ----
+        prompt = f"""
+You are a professional chef assistant.
+Using only these ingredients: {ingredients_list},
+generate a recipe response in strict JSON with this format:
+
+{{
+  "recipe_name": "string",
+  "ingredients": ["list of ingredients"],
+  "steps": ["list of short numbered steps"]
+}}
+"""
+
+        # call OpenAI (make sure OPENAI_API_KEY exists in .env)
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         response = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -62,15 +64,20 @@ async def detect_and_generate(file: UploadFile = File(...)):
         try:
             recipe_json = json.loads(content)
         except json.JSONDecodeError:
-            # Fallback to raw text if not valid JSON
             recipe_json = {"recipe_text": content}
 
         return {
-            "ingredients": detected["ingredients"],
+            "ingredients": detected.get("ingredients", []),
             "recipe": recipe_json
         }
 
     except Exception as e:
         print("❌ ERROR OCCURRED:")
         traceback.print_exc()
-        return {"error": str(e), "ingredients": detected["ingredients"]}
+        return {"error": str(e), "ingredients": detected.get("ingredients", [])}
+    finally:
+        # cleanup temp file
+        try:
+            os.remove(temp_path)
+        except Exception:
+            pass
