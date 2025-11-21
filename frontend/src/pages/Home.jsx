@@ -28,9 +28,19 @@ const Home = () => {
       const response = await uploadImageToServer(imageData);
       if (response.success) {
         setRecipe(response.recipe);
+        
+        // Optional: Show detected ingredients to user
+        if (response.ingredients && response.ingredients.length > 0) {
+          console.log('Detected ingredients:', response.ingredients);
+        }
+      } else {
+        // Handle error case
+        console.error('Recipe generation failed:', response.error);
+        alert(`Failed to generate recipe: ${response.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error generating recipe:', error);
+      alert('Failed to connect to the server. Please make sure the backend is running.');
     } finally {
       setLoading(false);
     }
