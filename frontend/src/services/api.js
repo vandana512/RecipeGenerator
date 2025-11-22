@@ -16,6 +16,29 @@ const dataURLtoFile = (dataUrl, filename) => {
 };
 
 /**
+ * Parse recipe string that might be wrapped in markdown code blocks
+ */
+const parseRecipeString = (recipeStr) => {
+  try {
+    let cleaned = recipeStr.trim();
+    
+    // Remove markdown code blocks with regex
+    const jsonMatch = cleaned.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+    if (jsonMatch) {
+      cleaned = jsonMatch[1];
+    } else {
+      // Fallback: remove any backticks or triple quotes
+      cleaned = cleaned.replace(/```json|```|'''json|'''/gi, '').trim();
+    }
+    
+    return JSON.parse(cleaned);
+  } catch (e) {
+    console.error('Failed to parse recipe string:', e);
+    return null;
+  }
+};
+
+/**
  * Upload image to server and get recipe
  * @param {string} imageData - Base64 encoded image or data URL
  * @returns {Promise<{success: boolean, recipe: object, ingredients: array, error?: string}>}
@@ -40,10 +63,27 @@ export const uploadImageToServer = async (imageData) => {
     }
 
     const data = await response.json();
+    console.log('Raw API Response:', data);
 
     // Check if there's an error in the response
     if (data.error) {
       throw new Error(data.error);
+    }
+
+    // Parse recipe if it's a string
+    let parsedRecipe = data.recipe;
+    if (typeof data.recipe === 'string') {
+      parsedRecipe = parseRecipeString(data.recipe);
+      console.log('Parsed Recipe:', parsedRecipe);
+    }
+
+    // If parsing failed or recipe is still a string, return as-is
+    if (!parsedRecipe || typeof parsedRecipe === 'string') {
+      return {
+        success: true,
+        ingredients: data.ingredients || [],
+        recipe: data.recipe // Return raw recipe
+      };
     }
 
     // Format the response to match frontend expectations
@@ -51,11 +91,11 @@ export const uploadImageToServer = async (imageData) => {
       success: true,
       ingredients: data.ingredients || [],
       recipe: {
-        name: data.recipe?.recipe_name || 'Generated Recipe',
-        ingredients: data.recipe?.ingredients || [],
-        instructions: data.recipe?.steps || [],
+        recipe_name: parsedRecipe.recipe_name || parsedRecipe.name || 'Generated Recipe',
+        ingredients: parsedRecipe.ingredients || [],
+        steps: parsedRecipe.steps || parsedRecipe.instructions || [],
         // If the API returns recipe_text instead of structured data
-        text: data.recipe?.recipe_text || null
+        text: parsedRecipe.recipe_text || null
       }
     };
 

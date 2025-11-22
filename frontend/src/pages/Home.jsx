@@ -27,7 +27,34 @@ const Home = () => {
     try {
       const response = await uploadImageToServer(imageData);
       if (response.success) {
-        setRecipe(response.recipe);
+        // Extract JSON from markdown code blocks using regex
+        let parsedRecipe = response.recipe;
+        
+        if (typeof response.recipe === 'string') {
+          try {
+            // Remove ```json ``` or ``` ``` wrapping
+            let cleanedRecipe = response.recipe.trim();
+            
+            // Check for markdown code blocks and extract JSON
+            const jsonMatch = cleanedRecipe.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+            if (jsonMatch) {
+              cleanedRecipe = jsonMatch[1];
+            }
+            
+            // Also handle triple backticks without json label
+            cleanedRecipe = cleanedRecipe.replace(/^```\s*/, '').replace(/\s*```$/, '');
+            
+            // Parse the cleaned JSON
+            parsedRecipe = JSON.parse(cleanedRecipe);
+            console.log('Successfully parsed recipe:', parsedRecipe);
+          } catch (e) {
+            console.error('Failed to parse recipe JSON:', e);
+            console.error('Raw recipe data:', response.recipe);
+            parsedRecipe = response.recipe; // Keep as string if parsing fails
+          }
+        }
+        
+        setRecipe(parsedRecipe);
         
         // Optional: Show detected ingredients to user
         if (response.ingredients && response.ingredients.length > 0) {

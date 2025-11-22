@@ -23,6 +23,32 @@ const RecipeCard = ({ recipe, loading }) => {
     );
   }
 
+  // Parse recipe if it's a string
+  let parsedRecipe = recipe;
+
+  if (typeof recipe === 'string') {
+    try {
+      // Remove markdown code blocks with regex
+      let cleaned = recipe.trim();
+      
+      // Match and extract JSON from ```json {...} ``` or ``` {...} ```
+      const jsonMatch = cleaned.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+      if (jsonMatch) {
+        cleaned = jsonMatch[1];
+      } else {
+        // Fallback: remove any remaining backticks or triple quotes
+        cleaned = cleaned.replace(/```json|```|'''json|'''/gi, '').trim();
+      }
+
+      parsedRecipe = JSON.parse(cleaned);
+      console.log('RecipeCard: Successfully parsed recipe:', parsedRecipe);
+    } catch (e) {
+      console.error('RecipeCard: Failed to parse recipe:', e);
+      console.error('RecipeCard: Raw recipe data:', recipe);
+      parsedRecipe = { text: recipe };
+    }
+  }
+
   return (
     <div className="bg-white rounded-xl shadow-lg p-6">
       {/* Recipe Header */}
@@ -31,21 +57,21 @@ const RecipeCard = ({ recipe, loading }) => {
           Suggested Recipe
         </span>
         <h2 className="text-2xl md:text-3xl font-bold text-slate-900 mt-2">
-          {recipe.name}
+          {parsedRecipe.recipe_name || parsedRecipe.name || 'Generated Recipe'}
         </h2>
       </div>
 
       {/* If recipe has text format (fallback) */}
-      {recipe.text && !recipe.ingredients?.length && (
+      {parsedRecipe.text && !parsedRecipe.ingredients?.length && (
         <div className="prose max-w-none">
           <pre className="whitespace-pre-wrap text-gray-700 font-sans">
-            {recipe.text}
+            {parsedRecipe.text}
           </pre>
         </div>
       )}
 
       {/* Structured Recipe Format */}
-      {recipe.ingredients?.length > 0 && (
+      {parsedRecipe.ingredients?.length > 0 && (
         <>
           {/* Ingredients Section */}
           <div className="mb-6">
@@ -53,7 +79,7 @@ const RecipeCard = ({ recipe, loading }) => {
               Ingredients
             </h3>
             <ul className="space-y-2">
-              {recipe.ingredients.map((ingredient, index) => (
+              {parsedRecipe.ingredients.map((ingredient, index) => (
                 <li key={index} className="flex items-start">
                   <span className="inline-block w-2 h-2 bg-orange-500 rounded-full mt-2 mr-3 shrink-0"></span>
                   <span className="text-gray-700">{ingredient}</span>
@@ -63,13 +89,13 @@ const RecipeCard = ({ recipe, loading }) => {
           </div>
 
           {/* Instructions Section */}
-          {recipe.instructions?.length > 0 && (
+          {parsedRecipe.steps?.length > 0 && (
             <div>
               <h3 className="text-xl font-semibold text-slate-900 mb-3">
-                Step Instructions
+                Instructions
               </h3>
               <ol className="space-y-3">
-                {recipe.instructions.map((step, index) => (
+                {parsedRecipe.steps.map((step, index) => (
                   <li key={index} className="flex items-start">
                     <span className="inline-flex items-center justify-center w-7 h-7 bg-orange-500 text-white rounded-full font-semibold text-sm mr-3 shrink-0">
                       {index + 1}

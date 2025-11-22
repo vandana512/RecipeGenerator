@@ -37,17 +37,35 @@ async def detect_and_generate(file: UploadFile = File(...)):
         ingredients_list = ", ".join([f"{i['count']} {i['name']}" for i in detected.get("ingredients", [])])
 
         # ---- LLM Prompt ----
-        prompt = f"""
-You are a professional chef assistant.
-Using only these ingredients: {ingredients_list},
-generate a recipe response in strict JSON with this format:
+        # Custom prompt logic
+        if ingredients_list.strip() == "":
+            prompt = """
+        Return a result in this exact JSON format:
 
-{{
-  "recipe_name": "string",
-  "ingredients": ["list of ingredients"],
-  "steps": ["list of short numbered steps"]
-}}
-"""
+        {
+          "title": "Unknown",
+          "ingredients": [],
+          "steps": []
+        }
+        """
+        else:
+            prompt = f"""
+        You are a professional recipe generator AI.
+
+        Using ONLY these ingredients: {ingredients_list}, generate a creative cooking recipe that involves 
+        actual cooking steps (e.g., roasting, baking, stir-frying, steaming). Avoid salads, fruit mixes, 
+        or any recipe that simply cuts and puts ingredients in a bowl to eat raw.
+
+        Output JSON ONLY. No explanation, no markdown, no text besides JSON.
+
+        JSON structure must be exactly:
+
+        {{
+          "title": "string",
+          "ingredients": ["list of strings"],
+          "steps": ["list of strings"]
+        }}
+        """
 
         genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
